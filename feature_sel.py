@@ -26,7 +26,7 @@ SEED = 1
 
 parser = argparse.ArgumentParser(description='run ml regressors on dataset')
 # parser.add_argument('--data_path', help='path to the dataset',default=None, type=str, required=False)
-parser.add_argument('--feature_csv', help='input feature data csv', default="./features/matminer_racs_all_clean.csv", type=str,required=False)
+parser.add_argument('--feature_csv', help='input feature data csv', default="./mof_features/racs_all_clean_metal_one.csv", type=str,required=False)
 parser.add_argument('--label_csv', help='input label data csv', default="./MOFs_oms/id_prop_oxo.csv", type=str,required=False)
 parser.add_argument('--output_dir', help='path to the save selected features', default="./output", type=str, required=False)
 parser.add_argument('--prop', help='target variable', choices=['oxo','h'], type=str,required=False)
@@ -92,7 +92,7 @@ def feature_selection(args, seed=1):
     #         kernel=kernel, alpha=noise_std**2, n_restarts_optimizer=9
     #     )
     #     regression_model = gaussian_process
-    tr = RecursiveFeatureAddition(estimator=regression_model, threshold=0.001, scoring="neg_mean_absolute_error", cv=5)
+    tr = RecursiveFeatureAddition(estimator=regression_model, threshold=0.005, scoring="neg_mean_absolute_error", cv=5)
     Xt = tr.fit_transform(X_train, y_train)
     print(tr.get_feature_names_out())
     print(tr.performance_drifts_)
@@ -101,7 +101,7 @@ def feature_selection(args, seed=1):
 if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     Xt = feature_selection(args)
-    file_name = f"{args.prop}_{args.algo}_feature_sel_oxo_1.csv"
+    file_name = f"{args.prop}_{args.algo}_feature_sel_oxo_2.csv"
     if args.output_dir:
         file_name = os.path.join(args.output_dir, file_name)
     Xt.to_csv(file_name, index = None)

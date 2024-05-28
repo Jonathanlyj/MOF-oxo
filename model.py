@@ -27,15 +27,15 @@ SEED = 1
 
 parser = argparse.ArgumentParser(description='run ml regressors on dataset')
 # parser.add_argument('--data_path', help='path to the dataset',default=None, type=str, required=False)
-parser.add_argument('--feature_csv', help='input feature data csv', default="./features/matminer_racs_all_clean.csv", type=str,required=False)
+parser.add_argument('--feature_csv', help='input feature data csv', default="./mof_features/racs_all_clean_metal_one.csv", type=str,required=False)
 parser.add_argument('--label_csv', help='input label data csv', default="./MOFs_oms/id_prop_oxo.csv", type=str,required=False)
+parser.add_argument('--extra_label_csv', help='extra input label data csv', type=str,required=False)
 parser.add_argument('--output_dir', help='path to the save trained models', default="./output", type=str, required=False)
 parser.add_argument('--prop', help='target variable', choices=['oxo','h'], type=str,required=False)
 parser.add_argument('--qbc', type=int,required=False)
 parser.add_argument('--kfold', help='enable k-fold cross-validation', action='store_true')
 parser.add_argument('--full', help='use full data for training', action='store_true')
 parser.add_argument('--algo', help='ml model to use', default="rf", type=str, choices=['rf','xgb', 'lgbm', 'gp'])
-parser.add_argument('--feature_sel_csv', help='input feature data csv', default="./features/matminer_racs_all_clean.csv", type=str,required=False)
 args =  parser.parse_args()
 # config = configparser.ConfigParser()
 # config.read('config.ini')
@@ -44,16 +44,16 @@ args =  parser.parse_args()
 # fea_sel_cols = ["racs_bb-linker_connecting_prop-X_scope-2_propagg-diff_corragg-sum_bbagg-sum","racs_bb-nodes_prop-X_scope-1_propagg-diff_corragg-sum_bbagg-sum",\
 #     "racs_bb-nodes_prop-z_scope-1_propagg-diff_corragg-sum_bbagg-sum","racs_bb-nodes_prop-z_scope-1_propagg-product_corragg-sum_bbagg-sum",\
 #         "racs_bb-nodes_prop-X_scope-0_propagg-product_corragg-sum_bbagg-sum","racs_bb-nodes_prop-z_scope-0_propagg-product_corragg-sum_bbagg-sum","Metal_Mn"]
-fea_sel_cols = ['racs_bb-linker_connecting_prop-X_scope-2_propagg-diff_corragg-sum_bbagg-sum', 'racs_bb-linker_functional_prop-I_scope-3_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-X_scope-1_propagg-diff_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-X_scope-1_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-z_scope-1_propagg-diff_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-z_scope-1_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-linker_functional_prop-I_scope-0_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-X_scope-0_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-z_scope-0_propagg-product_corragg-sum_bbagg-sum', 'Metal_Cd', 'Metal_Co', 'Metal_Ni']
+fea_sel_cols = ['racs_bb-linker_connecting_prop-X_scope-2_propagg-diff_corragg-sum_bbagg-sum', 'racs_bb-linker_functional_prop-I_scope-3_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-X_scope-1_propagg-diff_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-X_scope-1_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-z_scope-1_propagg-diff_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-z_scope-1_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-linker_functional_prop-I_scope-0_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-X_scope-0_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-z_scope-0_propagg-product_corragg-sum_bbagg-sum', 'encoded_Metal']
 
-def prepare_dataset(args, predict=False):
+def prepare_dataset(args, label_csv, predict=False):
 
-    assert str(args.prop) in str(args.label_csv)
+    assert str(args.prop) in str(label_csv)
     df_fea = pd.read_csv(args.feature_csv, index_col = 0)
     fea_cols = [col for col in df_fea.columns if not col in ['sample', 'Metal_index', 'MOF Name']]
     if args.algo == 'gp':
         fea_cols = [fea for fea in fea_cols if fea in fea_sel_cols]
-    df_label = pd.read_csv(args.label_csv)
+    df_label = pd.read_csv(label_csv)
     label_col = "Oxo Formation Energy" if args.prop == 'oxo' else "Hydrogen Affinity Energy"
         # print(df_fea.index)
         # print(df_fea[['sample', 'Metal_index']].info())
@@ -69,7 +69,7 @@ def prepare_dataset(args, predict=False):
 
         # Drop the merge indicator column
         df_all = df_all.drop(columns='_merge')
-        
+
     df_all['id'] = df_all['sample'] +'_'+ df_all['Metal_index'].astype(str)
     features = df_all[fea_cols].values
     ids = df_all.id.values
@@ -92,26 +92,34 @@ def dataset_split(ids, X, y, train_ratio=0.8, random=False, SEED=1):
 # Main function
 def run_regressor(args, seed=1):
 
-    ids, X, y = prepare_dataset(args)
+    ids, X, y = prepare_dataset(args, label_csv = args.label_csv)
+    if args.extra_label_csv:
+        ids_ext, X_ext, y_ext = prepare_dataset(args, label_csv = args.extra_label_csv)
     # Split the data into training and testing sets
     test_ratio = 0.2
     if args.kfold:
         pred_path = os.path.join(args.output_dir, f"{args.algo}_pred_{args.prop}_{len(y)}_idx_cv.csv")
         if os.path.exists(pred_path):
             os.remove(pred_path)
-        kf = KFold(n_splits = round(1/test_ratio), shuffle=True, random_state=seed + 10)
+        # kf = KFold(n_splits = round(1/test_ratio), shuffle=True, random_state=seed + 10)
+        kf = KFold(n_splits = round(1/test_ratio), shuffle=False)
         mads = []
         maes = []
         for fold_idx, (train_index, test_index) in enumerate(kf.split(X)):
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
             _, test_ids = ids[train_index], ids[test_index]
+            if args.extra_label_csv:
+                X_train = np.concatenate((X_train, X_ext), axis=0)
+                y_train = np.concatenate((y_train, y_ext), axis=0)
+            print(X_train[0])
             # # Initialize and fit a linear regression model
             logging.info(f"Started fitting to model for test + train: {len(X)} samples")
             if args.algo == 'rf':
                 regression_model = RandomForestRegressor(n_jobs = 32, n_estimators=300, max_depth=12, random_state=seed) #LinearRegression()
             elif args.algo == 'xgb':
-                regression_model = XGBRegressor(n_estimators=800, max_depth=12, eta=0.01, subsample=1.0, colsample_bytree=0.9)
+                regression_model = XGBRegressor(n_estimators=300, max_depth=12, eta=0.01, subsample=1.0, colsample_bytree=0.9)
+                # regression_model = XGBRegressor(n_jobs = 8)
             elif args.algo == 'gp':
                 # kernel = 1 * RBF(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
     
@@ -135,10 +143,11 @@ def run_regressor(args, seed=1):
             mae = mean_absolute_error(y_test, y_pred)
             logging.info(f"{args.prop}: Test mean_absolute_error: {mae}")
             maes.append(mae)
-
-            mads.append(mean_absolute_error(y_test, [np.mean(y_train)]*len(y_test)))
+            mad = mean_absolute_error(y_test, [np.mean(y_train)]*len(y_test))
+            mads.append(mad)
             
             df_pred = pd.DataFrame({'ids_test':test_ids, 'labels': y_test, 'predictions': y_pred})
+            print(f"MAD:{mad}")
 
             if not os.path.exists(pred_path):
                 df_pred.to_csv(pred_path)
@@ -151,7 +160,7 @@ def run_regressor(args, seed=1):
     else:
         if args.full:
             ids_train, X_train, y_train = ids, X, y
-            ids_test, X_test, _ = prepare_dataset(args, predict=True)
+            ids_test, X_test, _ = prepare_dataset(args, label_csv = args.label_csv, predict=True)
         else:
             ids_train, ids_test, X_train, X_test, y_train, y_test = dataset_split(ids, X, y, train_ratio=1 - test_ratio)
         if args.qbc:
@@ -208,7 +217,7 @@ if __name__ == "__main__":
         df_all['row_variances'] = row_variances
         df_all['row_std'] = np.sqrt(row_variances)
         df_sorted = df_all.sort_values(by='row_variances', ascending=False)
-        df_sorted.to_csv(os.path.join(args.output_dir, f"{args.algo}_pred_{args.prop}_idx_iter_all_var_query_1.csv"))
+        df_sorted.to_csv(os.path.join(args.output_dir, f"{args.algo}_pred_{args.prop}_idx_iter_all_var_query_2.csv"))
         
     else:
         df_pred = run_regressor(args)
