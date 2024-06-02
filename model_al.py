@@ -88,57 +88,76 @@ def dataset_split(ids, X, y, train_ratio=0.8, random=False, SEED=1):
     return  ids_train, ids_test, X_train, X_test, y_train, y_test
 
     
-steps = np.arange(0.1, 1.0, 10)
+steps = np.arange(0, 2000, 50)
 
 # Main function
 def run_regressor(args, seed=1):
 
-    ids_train, X_train, y_train = prepare_dataset(args, label_csv=args.train_label_csv)
+    ids_train_base, X_train_base, y_train_base = prepare_dataset(args, label_csv=args.train_label_csv)
     ids_test, X_test, y_test = prepare_dataset(args, label_csv=args.test_label_csv)
     if args.extra_label_csv:
         ids_ext, X_ext, y_ext = prepare_dataset(args, label_csv = args.extra_label_csv)
-        ids_train = np.concatenate((ids_train, ids_ext))
-        X_train = np.concatenate((X_train, X_ext))
-        y_train = np.concatenate((y_train, y_ext))
+
 
     # # Initialize and fit a linear regression model
-    logging.info(f"Started fitting to model for test + train: {len(X_train) + len(X_test)} samples")
-    if args.algo == 'rf':
-        regression_model = RandomForestRegressor(n_jobs = 32, n_estimators=300, max_depth=12, random_state=SEED) #LinearRegression()
-    elif args.algo == 'xgb':
-        regression_model = XGBRegressor(n_estimators=300, max_depth=12, eta=0.01, subsample=1.0, colsample_bytree=0.9)
-        # regression_model = XGBRegressor(n_jobs = 8)
-    elif args.algo == 'gp':
-        # kernel = 1 * RBF(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
-
-        # kernel = 1 * RationalQuadratic(length_scale=1.0, alpha=0.1)
-        # kernel = 1 * RBF(length_scale=1.0) + 1 * Matern(length_scale=1.0, nu=1.5)
-        # kernel = 1 * RBF(length_scale=1.0) * 1 * DotProduct(sigma_0=1.0)
-        kernel = 1 * RationalQuadratic(length_scale=1.0, alpha=0.1) + 1 * RBF(length_scale=1.0)
-        # kernel = 1 * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e2), nu=1.5)
-        # kernel = 1 * DotProduct(sigma_0=1.0)
-        regression_model = GaussianProcessRegressor(kernel=kernel, alpha=1e-2, n_restarts_optimizer=9)
-    regression_model.fit(X_train, y_train)
-    # Evaluate the model
-    result = defaultdict(list)
-    y_pred = regression_model.predict(X_train)
-    mae = mean_absolute_error(y_train, y_pred)
     
-    result['prop'].append(args.prop)
-    result['Train_mae'].append(mae)
-    # result['Train_mad'].append(np.mean(np.abs(y_train - np.mean(y_train))))
-    y_pred = regression_model.predict(X_test)
-    df_pred = pd.DataFrame({'ids_test':ids_test, f'predictions_seed_{seed}': y_pred})
-        # df_pred.to_csv(os.path.join(args.output_dir, f"rf_pred_{args.prop}_{len(y)}_idx_iter_{seed}.csv"))
+    train_lens = []
+    maes = []
+    for i,step in enumerate(steps):
+        ids_train = np.concatenate((ids_train_base, ids_ext[:step]))
+        X_train = np.concatenate((X_train_base, X_ext[:step]))
+        y_train = np.concatenate((y_train_base, y_ext[:step]))
 
+        logging.info(f"Started fitting to model for test + train: {len(X_train) + len(X_test)} samples")
+        if args.algo == 'rf':
+            regression_model = RandomForestRegressor(n_jobs = 32, n_estimators=300, max_depth=12, random_state=SEED) #LinearRegression()
+        elif args.algo == 'xgb':
+            regression_model = XGBRegressor(n_estimators=300, max_depth=12, eta=0.01, subsample=1.0, colsample_bytree=0.9)
+            # regression_model = XGBRegressor(n_jobs = 8)
+        elif args.algo == 'gp':
+            # kernel = 1 * RBF(length_scale=1.0, length_scale_bounds=(1e-2, 1e2))
+
+            # kernel = 1 * RationalQuadratic(length_scale=1.0, alpha=0.1)
+            # kernel = 1 * RBF(length_scale=1.0) + 1 * Matern(length_scale=1.0, nu=1.5)
+            # kernel = 1 * RBF(length_scale=1.0) * 1 * DotProduct(sigma_0=1.0)
+            kernel = 1 * RationalQuadratic(length_scale=1.0, alpha=0.1) + 1 * RBF(length_scale=1.0)
+            # kernel = 1 * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e2), nu=1.5)
+            # kernel = 1 * DotProduct(sigma_0=1.0)
+            regression_model = GaussianProcessRegressor(kernel=kernel, alpha=1e-2, n_restarts_optimizer=9)
+        regression_model.fit(X_train, y_train)
+        # Evaluate the model
+        result = defaultdict(list)
+        y_pred = regression_model.predict(X_train)
+        mae = mean_absolute_error(y_train, y_pred)
         
-    mse = mean_squared_error(y_test, y_pred)
-    mae = mean_absolute_error(y_test, y_pred)
+        result['prop'].append(args.prop)
+        result['Train_mae'].append(mae)
+        # result['Train_mad'].append(np.mean(np.abs(y_train - np.mean(y_train))))
+        y_pred = regression_model.predict(X_test)
+        df_pred = pd.DataFrame({'ids_test':ids_test, f'predictions_seed_{seed}': y_pred})
+            # df_pred.to_csv(os.path.join(args.output_dir, f"rf_pred_{args.prop}_{len(y)}_idx_iter_{seed}.csv"))
 
-    return mae
+            
+        mse = mean_squared_error(y_test, y_pred)
+        mae = mean_absolute_error(y_test, y_pred)
+        
+
+        train_lens.append(step)
+        maes.append(mae)
+    data = {
+    'train_lens': train_lens,
+    'maes': maes
+    }
+
+    # Convert the dictionary to a DataFrame
+    df = pd.DataFrame(data)
+    return df
 
 if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s %(levelname)-8s %(message)s', level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
-    mae = run_regressor(args)
-    logging.info(f"{args.prop}: Test mean_absolute_error: {mae}")
+    df_mae = run_regressor(args)
+    # logging.info(f"{args.prop}: Test mean_absolute_error: {mae}")
+    df_mae.to_csv(f"{args.prop}_{args.algo}_al_{args.extra_label_csv.split('/')[-1].split('.')[0].split('_')[-1]}.csv")
+    
+    
     
