@@ -27,7 +27,7 @@ SEED = 1
 
 parser = argparse.ArgumentParser(description='run ml regressors on dataset')
 # parser.add_argument('--data_path', help='path to the dataset',default=None, type=str, required=False)
-parser.add_argument('--feature_csv', help='input feature data csv', default="./mof_features/racs_all_clean_metal_one.csv", type=str,required=False)
+parser.add_argument('--feature_csv', help='input feature data csv', default="./mof_features/racs_all_clean_q3_oxi_state_metal_one_node_only.csv", type=str,required=False)
 parser.add_argument('--label_csv', help='input label data csv', default="./MOFs_oms/id_prop_oxo.csv", type=str,required=False)
 parser.add_argument('--extra_label_csv', help='extra input label data csv', type=str,required=False)
 parser.add_argument('--output_dir', help='path to the save trained models', default="./output", type=str, required=False)
@@ -44,7 +44,10 @@ args =  parser.parse_args()
 # fea_sel_cols = ["racs_bb-linker_connecting_prop-X_scope-2_propagg-diff_corragg-sum_bbagg-sum","racs_bb-nodes_prop-X_scope-1_propagg-diff_corragg-sum_bbagg-sum",\
 #     "racs_bb-nodes_prop-z_scope-1_propagg-diff_corragg-sum_bbagg-sum","racs_bb-nodes_prop-z_scope-1_propagg-product_corragg-sum_bbagg-sum",\
 #         "racs_bb-nodes_prop-X_scope-0_propagg-product_corragg-sum_bbagg-sum","racs_bb-nodes_prop-z_scope-0_propagg-product_corragg-sum_bbagg-sum","Metal_Mn"]
-fea_sel_cols = ['racs_bb-linker_connecting_prop-X_scope-2_propagg-diff_corragg-sum_bbagg-sum', 'racs_bb-linker_functional_prop-I_scope-3_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-X_scope-1_propagg-diff_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-X_scope-1_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-z_scope-1_propagg-diff_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-z_scope-1_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-linker_functional_prop-I_scope-0_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-X_scope-0_propagg-product_corragg-sum_bbagg-sum', 'racs_bb-nodes_prop-z_scope-0_propagg-product_corragg-sum_bbagg-sum', 'encoded_Metal']
+
+fea_sel_cols = ["racs_bb-nodes_prop-covalent_radius_scope-1_propagg-diff_corragg-sum_bbagg-sum", "racs_bb-nodes_prop-covalent_radius_scope-3_propagg-product_corragg-sum_bbagg-sum", \
+    "racs_bb-nodes_prop-z_scope-2_propagg-product_corragg-sum_bbagg-sum", "racs_bb-nodes_prop-X_scope-0_propagg-product_corragg-sum_bbagg-sum", "racs_bb-nodes_prop-z_scope-0_propagg-product_corragg-sum_bbagg-sum",\
+    "encoded_Metal", "Oxidation_Metal_Site_oximachine"]
 
 def prepare_dataset(args, label_csv, predict=False):
 
@@ -109,11 +112,10 @@ def run_regressor(args, seed=1):
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
             _, test_ids = ids[train_index], ids[test_index]
+            print(X_train.shape, X_test.shape)
             if args.extra_label_csv:
                 X_train = np.concatenate((X_train, X_ext), axis=0)
                 y_train = np.concatenate((y_train, y_ext), axis=0)
-            print(X_train[0])
-            # # Initialize and fit a linear regression model
             logging.info(f"Started fitting to model for test + train: {len(X)} samples")
             if args.algo == 'rf':
                 regression_model = RandomForestRegressor(n_jobs = 32, n_estimators=300, max_depth=12, random_state=seed) #LinearRegression()
@@ -217,7 +219,7 @@ if __name__ == "__main__":
         df_all['row_variances'] = row_variances
         df_all['row_std'] = np.sqrt(row_variances)
         df_sorted = df_all.sort_values(by='row_variances', ascending=False)
-        df_sorted.to_csv(os.path.join(args.output_dir, f"{args.algo}_pred_{args.prop}_idx_iter_all_var_query_2.csv"))
+        # df_sorted.to_csv(os.path.join(args.output_dir, f"{args.algo}_pred_{args.prop}_idx_iter_all_var_query_2.csv"))
         
     else:
         df_pred = run_regressor(args)
