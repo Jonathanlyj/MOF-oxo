@@ -291,7 +291,7 @@ def run_classifier(args, seed=1):
             print(aml.leaderboard)
             model_path = h2o.save_model(model=classifier_model, path=args.output_dir, force=True)
             print("Model saved to:", model_path)
-            # classifier_model = h2o.load_model("/scratch/yll6162/MOF-oxo/classification/StackedEnsemble_BestOfFamily_8_AutoML_1_20240601_203645")
+            # classifier_model = h2o.load_model("/scratch/yll6162/MOF-oxo/classification/StackedEnsemble_BestOfFamily_7_AutoML_3_20240601_231929")
             # Convert X_test to H2OFrame
             # Get the cross-validation metrics for the best model
 

@@ -88,7 +88,7 @@ def dataset_split(ids, X, y, train_ratio=0.8, random=False, SEED=1):
     return  ids_train, ids_test, X_train, X_test, y_train, y_test
 
     
-steps = np.arange(0, 2000, 50)
+
 
 # Main function
 def run_regressor(args, seed=1):
@@ -98,7 +98,15 @@ def run_regressor(args, seed=1):
     if args.extra_label_csv:
         ids_ext, X_ext, y_ext = prepare_dataset(args, label_csv = args.extra_label_csv)
 
+    assert args.prop in args.train_label_csv
+    if args.extra_label_csv:
+        assert args.prop in args.extra_label_csv
+    assert args.prop in args.test_label_csv
+    base_len = len(X_train_base)
+    exit_len = len(X_ext)
 
+    # steps = np.arange(0, exit_len, 1)
+    steps = [0, 166, 166 + 407, 166 + 407 + 341]
     # # Initialize and fit a linear regression model
     
     train_lens = []
@@ -142,7 +150,7 @@ def run_regressor(args, seed=1):
         mae = mean_absolute_error(y_test, y_pred)
         
 
-        train_lens.append(step)
+        train_lens.append(base_len+step)
         maes.append(mae)
     data = {
     'train_lens': train_lens,
